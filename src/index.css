@@ -1,0 +1,90 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, 'Noto Sans TC', 'PingFang TC',
+    'Microsoft JhengHei', sans-serif;
+  background-color: #0b1120;
+  color: #e2e8f0;
+}
+
+/* React Flow 連線在懸空(orphaned)狀態下的虛線樣式 */
+.react-flow__edge.edge-orphaned .react-flow__edge-path {
+  stroke-dasharray: 6 4;
+  opacity: 0.4;
+}
+
+.react-flow__edge.edge-falsified .react-flow__edge-path {
+  stroke: #ef4444;
+  opacity: 0.5;
+}
+
+/* 連線不攔截點擊，避免跨階層 Shift+Click 誤觸連線而選不到節點 */
+.react-flow__edge {
+  pointer-events: none;
+}
+
+.react-flow__attribution {
+  display: none;
+}
+
+/* 縮放控制按鈕：深色底 + 淺色圖示 */
+.react-flow__controls {
+  background: #1e293b !important;
+  border: 1px solid #475569 !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 35%) !important;
+  overflow: hidden;
+}
+
+.react-flow__controls-button {
+  background: #1e293b !important;
+  border: none !important;
+  border-bottom: 1px solid #334155 !important;
+  color: #e2e8f0 !important;
+  fill: #e2e8f0 !important;
+  width: 28px !important;
+  height: 28px !important;
+}
+
+.react-flow__controls-button:last-child {
+  border-bottom: none !important;
+}
+
+.react-flow__controls-button:hover {
+  background: #334155 !important;
+}
+
+.react-flow__controls-button svg {
+  fill: #e2e8f0 !important;
+  max-width: 14px;
+  max-height: 14px;
+}
+
+.react-flow__controls-button:disabled {
+  opacity: 0.35;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
