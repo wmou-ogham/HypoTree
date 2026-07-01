@@ -257,6 +257,8 @@ export function EvidencePanel() {
             onChange={(e) => updateNode(node.id, { title: e.target.value })}
             onBlur={() => commitTitleEdit()}
             onKeyDown={(e) => {
+              const isImeEnter = e.nativeEvent.isComposing || e.keyCode === 229;
+
               if (e.key === 'Tab' && e.shiftKey) {
                 e.preventDefault();
                 commitTitleEdit();
@@ -270,12 +272,14 @@ export function EvidencePanel() {
                 return;
               }
               if (e.key === 'Enter' && e.shiftKey) {
+                if (isImeEnter) return;
                 e.preventDefault();
                 commitTitleEdit();
                 addSibling(node.id);
                 return;
               }
               if (e.key === 'Enter') {
+                if (isImeEnter) return;
                 e.preventDefault();
                 finishTitleEdit();
                 return;

@@ -14,7 +14,7 @@ import { ResearchNodeView } from './nodes/ResearchNodeView';
 import { MarqueeSelection, skipNextPaneClickRef } from './MarqueeSelection';
 import { STATUS_STYLES } from '../lib/statusStyles';
 import { isShiftClick, useShiftHeld } from '../hooks/useShiftHeld';
-import type { ComputedNode } from '../types';
+import { hiddenNodeIds } from '../lib/visibleNodes';
 
 const nodeTypes = { research: ResearchNodeView };
 
@@ -31,30 +31,6 @@ function FitViewController() {
   }, [fitViewRequest, fitView]);
 
   return null;
-}
-
-/** 計算被收合節點隱藏的後代集合 */
-function hiddenSet(nodes: ComputedNode[]): Set<string> {
-  const byId = new Map(nodes.map((n) => [n.id, n]));
-  const childrenOf = new Map<string, string[]>();
-  for (const n of nodes) {
-    if (n.parentId) {
-      const arr = childrenOf.get(n.parentId) ?? [];
-      arr.push(n.id);
-      childrenOf.set(n.parentId, arr);
-    }
-  }
-  const hidden = new Set<string>();
-  const hideSubtree = (id: string) => {
-    for (const cid of childrenOf.get(id) ?? []) {
-      hidden.add(cid);
-      hideSubtree(cid);
-    }
-  };
-  for (const n of nodes) {
-    if (n.collapsed && byId.has(n.id)) hideSubtree(n.id);
-  }
-  return hidden;
 }
 
 function blurSidebarField() {
@@ -82,7 +58,7 @@ export function Canvas() {
     return counts;
   }, [computedNodes]);
 
-  const hidden = useMemo(() => hiddenSet(computedNodes), [computedNodes]);
+  const hidden = useMemo(() => hiddenNodeIds(computedNodes), [computedNodes]);
 
   const rfNodes: Node[] = useMemo(
     () =>

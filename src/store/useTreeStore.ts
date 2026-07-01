@@ -10,6 +10,7 @@ import {
 import { createEmptyResearch, createSeedNodes } from '../lib/seed';
 import { migrateNode } from '../lib/markdown';
 import { syncStatusWithEvidence, syncAllNodesEvidenceStatus } from '../lib/statusSync';
+import { neighborNodeId, type NavDirection } from '../lib/nodeNavigation';
 
 const uid = () => crypto.randomUUID();
 const HISTORY_LIMIT = 50;
@@ -40,6 +41,7 @@ interface TreeState {
   select: (id: string | null, options?: { shiftKey?: boolean }) => void;
   selectMany: (ids: string[]) => void;
   selectParent: () => void;
+  selectNeighbor: (direction: NavDirection) => void;
   setEditing: (id: string | null) => void;
   commitTitleEdit: () => void;
   requestNoteFocus: () => void;
@@ -246,6 +248,18 @@ export const useTreeStore = create<TreeState>((set, get) => {
       set({
         selectedId: node.parentId,
         selectedIds: [node.parentId],
+        editingId: null,
+        titleCommitted: false,
+      });
+    },
+    selectNeighbor: (direction) => {
+      const { selectedId, editingId, computedNodes, nodes } = get();
+      if (!selectedId || editingId) return;
+      const nextId = neighborNodeId(direction, selectedId, computedNodes, nodes);
+      if (!nextId || nextId === selectedId) return;
+      set({
+        selectedId: nextId,
+        selectedIds: [nextId],
         editingId: null,
         titleCommitted: false,
       });

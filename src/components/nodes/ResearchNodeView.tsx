@@ -8,12 +8,12 @@ export type ResearchNodeData = ComputedNode & {
   childCount: number;
 };
 
-/** 畫布卡片備註預覽（單行、固定寬度內截斷） */
+/** 畫布卡片備註預覽（僅第一行、固定寬度內截斷） */
 function notePreview(note: string | undefined, maxLen = 22): string {
-  const text = (note ?? '').trim().replace(/\s+/g, ' ');
-  if (!text) return '';
-  if (text.length <= maxLen) return text;
-  return `${text.slice(0, maxLen)}…`;
+  const firstLine = (note ?? '').split(/\r?\n/)[0]?.trim() ?? '';
+  if (!firstLine) return '';
+  if (firstLine.length <= maxLen) return firstLine;
+  return `${firstLine.slice(0, maxLen)}…`;
 }
 
 function ResearchNodeViewImpl({ id, data, selected }: NodeProps) {
