@@ -1,4 +1,10 @@
-import type { Evidence, NodeStatus, ResearchNode } from '../types';
+import type { CheckItem, Evidence, NodeStatus, ResearchNode } from '../types';
+import {
+  CHECKLIST_CHECKED,
+  CHECKLIST_UNCHECKED,
+  progressFromCheckItems,
+  withSyncedProgress,
+} from './checklist';
 
 const uid = () => crypto.randomUUID();
 
@@ -83,8 +89,9 @@ export function exportMarkdown(nodes: ResearchNode[]): string {
       lines.push(`${sub}- ${node.note.replace(/\s*\n\s*/g, ' ').trim()}`);
     }
 
-    if (typeof node.progress === 'number') {
-      lines.push(`${sub}- 實驗進度: ${node.progress}%`);
+    for (const item of node.checkItems ?? []) {
+      const mark = item.done ? CHECKLIST_CHECKED : CHECKLIST_UNCHECKED;
+      lines.push(`${sub}- ${mark} ${item.text.trim()}`);
     }
 
     for (const e of node.evidence) {
@@ -179,11 +186,23 @@ function parseEvidenceSub(text: string): Evidence | null {
 }
 
 function parseSubItem(text: string): {
-  kind: 'note' | 'progress' | 'evidence';
+  kind: 'note' | 'progress' | 'evidence' | 'checkItem';
   note?: string;
   progress?: number;
   evidence?: Evidence;
+  checkItem?: Omit<CheckItem, 'id'>;
 } {
+  const checklistMatch = text.match(/^([☐☑])\s*(.*)$/);
+  if (checklistMatch) {
+    return {
+      kind: 'checkItem',
+      checkItem: {
+        text: checklistMatch[2].trim(),
+        done: checklistMatch[1] === CHECKLIST_CHECKED,
+      },
+    };
+  }
+
   const progressMatch = text.match(/^實驗進度\s*[:：]\s*(\d+)\s*%?$/);
   if (progressMatch) {
     return { kind: 'progress', progress: Number(progressMatch[1]) };
@@ -217,6 +236,7 @@ export function importMarkdown(md: string): ResearchNode[] {
         title: parsed.text ?? '未命名',
         status: parsed.status ?? 'hypothesis',
         evidence: [],
+        checkItems: [],
         parentId,
         position: { x: 0, y: 0 },
       };
@@ -225,8 +245,16 @@ export function importMarkdown(md: string): ResearchNode[] {
       lastTask = node;
     } else if (parsed.type === 'sub' && lastTask && parsed.subText) {
       const result = parseSubItem(parsed.subText);
-      if (result.kind === 'progress') lastTask.progress = result.progress;
-      else if (result.kind === 'note') {
+      if (result.kind === 'checkItem' && result.checkItem) {
+        const items = lastTask.checkItems ?? [];
+        lastTask.checkItems = [
+          ...items,
+          { id: uid(), text: result.checkItem.text, done: result.checkItem.done },
+        ];
+        lastTask.progress = progressFromCheckItems(lastTask.checkItems);
+      } else if (result.kind === 'progress') {
+        /* 舊版 Markdown 的實驗進度行略過，改由 checklist 計算 */
+      } else if (result.kind === 'note') {
         lastTask.note = lastTask.note
           ? `${lastTask.note}\n${result.note}`
           : result.note;
@@ -234,20 +262,20 @@ export function importMarkdown(md: string): ResearchNode[] {
     }
   }
 
-  return nodes;
+  return nodes.map((n) => withSyncedProgress(n));
 }
 
-/** 舊版資料遷移：conflicting → experimenting，confidence → progress */
+/** 舊版資料遷移：conflicting → experimenting，confidence → progress（無 checklist 時歸零） */
 export function migrateNode(node: ResearchNode): ResearchNode {
   const raw = node as ResearchNode & { confidence?: number };
   const statusRaw = raw.status as string;
   const status: NodeStatus =
     statusRaw === 'conflicting' ? 'experimenting' : (raw.status as NodeStatus);
 
-  const { confidence, ...rest } = raw;
-  return {
+  const { confidence: _confidence, ...rest } = raw;
+  return withSyncedProgress({
     ...rest,
     status,
-    progress: rest.progress ?? confidence,
-  };
+    checkItems: rest.checkItems ?? [],
+  });
 }

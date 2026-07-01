@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { ComputedNode, Evidence, NodeStatus, ResearchNode } from '../types';
 import { computeDerivedStatus } from '../lib/inference';
-import { layoutTree } from '../lib/layout';
+import { layoutTree, NUDGE_STEP } from '../lib/layout';
 import {
   createDocument,
   loadDocument,
@@ -11,6 +11,7 @@ import { createEmptyResearch, createSeedNodes } from '../lib/seed';
 import { migrateNode } from '../lib/markdown';
 import { syncStatusWithEvidence, syncAllNodesEvidenceStatus } from '../lib/statusSync';
 import { neighborNodeId, type NavDirection } from '../lib/nodeNavigation';
+import { withSyncedProgress } from '../lib/checklist';
 
 const uid = () => crypto.randomUUID();
 const HISTORY_LIMIT = 50;
@@ -42,6 +43,7 @@ interface TreeState {
   selectMany: (ids: string[]) => void;
   selectParent: () => void;
   selectNeighbor: (direction: NavDirection) => void;
+  nudgeSelectedPosition: (direction: NavDirection) => void;
   setEditing: (id: string | null) => void;
   commitTitleEdit: () => void;
   requestNoteFocus: () => void;
@@ -60,6 +62,11 @@ interface TreeState {
   addEvidence: (nodeId: string, ev: Omit<Evidence, 'id'>) => void;
   updateEvidence: (nodeId: string, evId: string, patch: Partial<Evidence>) => void;
   removeEvidence: (nodeId: string, evId: string) => void;
+
+  addCheckItem: (nodeId: string, text: string) => void;
+  updateCheckItem: (nodeId: string, itemId: string, patch: { text?: string; done?: boolean }) => void;
+  toggleCheckItem: (nodeId: string, itemId: string) => void;
+  removeCheckItem: (nodeId: string, itemId: string) => void;
 
   replaceAll: (nodes: ResearchNode[], name?: string) => void;
   relayout: () => void;
@@ -82,7 +89,11 @@ export const useTreeStore = create<TreeState>((set, get) => {
 
   const withLayout = (nodes: ResearchNode[]): ResearchNode[] => {
     const pos = layoutTree(nodes);
-    return nodes.map((n) => (pos[n.id] ? { ...n, position: pos[n.id] } : n));
+    return nodes.map((n) => {
+      if (!pos[n.id]) return n;
+      const off = n.positionOffset ?? { x: 0, y: 0 };
+      return { ...n, position: { x: pos[n.id].x + off.x, y: pos[n.id].y + off.y } };
+    });
   };
 
   const withComputed = (nodes: ResearchNode[]) => computeDerivedStatus(nodes);
@@ -264,6 +275,32 @@ export const useTreeStore = create<TreeState>((set, get) => {
         titleCommitted: false,
       });
     },
+    nudgeSelectedPosition: (direction) => {
+      const { selectedId, selectedIds, editingId } = get();
+      if (!selectedId || editingId || selectedIds.length !== 1) return;
+
+      const delta =
+        direction === 'up'
+          ? { x: 0, y: -NUDGE_STEP }
+          : direction === 'down'
+          ? { x: 0, y: NUDGE_STEP }
+          : direction === 'left'
+          ? { x: -NUDGE_STEP, y: 0 }
+          : { x: NUDGE_STEP, y: 0 };
+
+      patchNodes((nodes) =>
+        nodes.map((n) => {
+          if (n.id !== selectedId) return n;
+          const off = n.positionOffset ?? { x: 0, y: 0 };
+          const nextOff = { x: off.x + delta.x, y: off.y + delta.y };
+          return {
+            ...n,
+            positionOffset: nextOff,
+            position: { x: n.position.x + delta.x, y: n.position.y + delta.y },
+          };
+        })
+      );
+    },
     setEditing: (id) => {
       if (!id) {
         set({ editingId: null });
@@ -425,6 +462,52 @@ export const useTreeStore = create<TreeState>((set, get) => {
             ...n,
             evidence: n.evidence.filter((e) => e.id !== evId),
           });
+        })
+      );
+    },
+
+    addCheckItem: (nodeId, text) => {
+      const trimmed = text.trim();
+      if (!trimmed) return;
+      patchNodes((nodes) =>
+        nodes.map((n) => {
+          if (n.id !== nodeId) return n;
+          const checkItems = [...(n.checkItems ?? []), { id: uid(), text: trimmed, done: false }];
+          return withSyncedProgress({ ...n, checkItems });
+        })
+      );
+    },
+
+    updateCheckItem: (nodeId, itemId, patch) => {
+      patchNodes((nodes) =>
+        nodes.map((n) => {
+          if (n.id !== nodeId) return n;
+          const checkItems = (n.checkItems ?? []).map((item) =>
+            item.id === itemId ? { ...item, ...patch } : item
+          );
+          return withSyncedProgress({ ...n, checkItems });
+        })
+      );
+    },
+
+    toggleCheckItem: (nodeId, itemId) => {
+      patchNodes((nodes) =>
+        nodes.map((n) => {
+          if (n.id !== nodeId) return n;
+          const checkItems = (n.checkItems ?? []).map((item) =>
+            item.id === itemId ? { ...item, done: !item.done } : item
+          );
+          return withSyncedProgress({ ...n, checkItems });
+        })
+      );
+    },
+
+    removeCheckItem: (nodeId, itemId) => {
+      patchNodes((nodes) =>
+        nodes.map((n) => {
+          if (n.id !== nodeId) return n;
+          const checkItems = (n.checkItems ?? []).filter((item) => item.id !== itemId);
+          return withSyncedProgress({ ...n, checkItems });
         })
       );
     },

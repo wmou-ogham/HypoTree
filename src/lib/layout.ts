@@ -4,6 +4,7 @@ const NODE_WIDTH = 240;
 const NODE_VGAP = 28;
 const LEVEL_HGAP = 130;
 const ROW_HEIGHT = 86;
+export const NUDGE_STEP = 16;
 
 /**
  * 簡易橫向樹狀佈局（root 在左，子節點向右展開）。

@@ -3,6 +3,7 @@ import type { ComputedNode, EvidenceType, NodeStatus } from '../../types';
 import { useTreeStore } from '../../store/useTreeStore';
 import { STATUS_ORDER, STATUS_STYLES } from '../../lib/statusStyles';
 import { getBlobUrl, saveBlob } from '../../lib/persistence';
+import { useImeEnterGuard } from '../../hooks/useImeEnterGuard';
 
 const EVIDENCE_TYPE_LABELS: Record<EvidenceType, string> = {
   citation: '文獻引用',
@@ -107,9 +108,15 @@ export function EvidencePanel() {
   const removeNode = useTreeStore((s) => s.removeNode);
   const addChild = useTreeStore((s) => s.addChild);
   const addSibling = useTreeStore((s) => s.addSibling);
+  const addCheckItem = useTreeStore((s) => s.addCheckItem);
+  const updateCheckItem = useTreeStore((s) => s.updateCheckItem);
+  const toggleCheckItem = useTreeStore((s) => s.toggleCheckItem);
+  const removeCheckItem = useTreeStore((s) => s.removeCheckItem);
 
   const titleRef = useRef<HTMLInputElement>(null);
   const noteRef = useRef<HTMLTextAreaElement>(null);
+  const titleIme = useImeEnterGuard();
+  const checkItemIme = useImeEnterGuard();
 
   const blurField = () => {
     (document.activeElement as HTMLElement | null)?.blur();
@@ -140,6 +147,7 @@ export function EvidencePanel() {
   const [newLabel, setNewLabel] = useState('');
   const [newAnnotation, setNewAnnotation] = useState('');
   const [newValue, setNewValue] = useState('');
+  const [newCheckItem, setNewCheckItem] = useState('');
 
   useEffect(() => {
     if (editingId && editingId === selectedId && titleRef.current) {
@@ -226,6 +234,16 @@ export function EvidencePanel() {
     setNewValue('');
   };
 
+  const handleAddCheckItem = () => {
+    if (!newCheckItem.trim()) return;
+    addCheckItem(node.id, newCheckItem);
+    setNewCheckItem('');
+  };
+
+  const checkItems = node.checkItems ?? [];
+  const checkDone = checkItems.filter((i) => i.done).length;
+  const progress = node.progress ?? 0;
+
   const handleImageUpload = async (file: File) => {
     const key = await saveBlob(file);
     addEvidence(node.id, {
@@ -256,8 +274,10 @@ export function EvidencePanel() {
             value={node.title}
             onChange={(e) => updateNode(node.id, { title: e.target.value })}
             onBlur={() => commitTitleEdit()}
+            onCompositionStart={titleIme.onCompositionStart}
+            onCompositionEnd={titleIme.onCompositionEnd}
             onKeyDown={(e) => {
-              const isImeEnter = e.nativeEvent.isComposing || e.keyCode === 229;
+              const isImeEnter = titleIme.isImeEnter(e);
 
               if (e.key === 'Tab' && e.shiftKey) {
                 e.preventDefault();
@@ -313,23 +333,6 @@ export function EvidencePanel() {
         <StatusGrid activeStatus={node.status} onPick={setStatusForSelected} />
 
         <section>
-          <h3 className="mb-2 flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-slate-400">
-            <span>實驗進度</span>
-            <span className="text-sky-400">{node.progress ?? 0}%</span>
-          </h3>
-          <input
-            type="range"
-            tabIndex={-1}
-            min={0}
-            max={100}
-            step={5}
-            value={node.progress ?? 0}
-            onChange={(e) => updateNode(node.id, { progress: Number(e.target.value) })}
-            className="w-full accent-sky-500"
-          />
-        </section>
-
-        <section>
           <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
             備註
           </h3>
@@ -360,6 +363,79 @@ export function EvidencePanel() {
             tabIndex={-1}
             className="w-full resize-y rounded bg-slate-800 px-2 py-1.5 text-sm text-slate-200 outline-none focus:ring-1 focus:ring-sky-500"
           />
+        </section>
+
+        <section>
+          <h3 className="mb-2 flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-slate-400">
+            <span>驗證步驟</span>
+            <span className="normal-case text-sky-400">
+              {checkItems.length ? `${checkDone}/${checkItems.length} · ${progress}%` : '—'}
+            </span>
+          </h3>
+          {checkItems.length > 0 && (
+            <div className="mb-2 h-1 overflow-hidden rounded-full bg-slate-800">
+              <div
+                className="h-full rounded-full bg-sky-500/80 transition-[width] duration-150"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          )}
+          <ul className="space-y-1.5">
+            {checkItems.map((item) => (
+              <li
+                key={item.id}
+                className="flex items-start gap-2 rounded-lg border border-slate-700/80 bg-slate-800/40 px-2 py-1.5"
+              >
+                <input
+                  type="checkbox"
+                  checked={item.done}
+                  onChange={() => toggleCheckItem(node.id, item.id)}
+                  className="mt-0.5 shrink-0 accent-sky-500"
+                  title={item.done ? '標記為未完成' : '標記為完成'}
+                />
+                <input
+                  value={item.text}
+                  onChange={(e) => updateCheckItem(node.id, item.id, { text: e.target.value })}
+                  className={`min-w-0 flex-1 bg-transparent text-sm outline-none ${
+                    item.done ? 'text-slate-500 line-through' : 'text-slate-200'
+                  }`}
+                />
+                <button
+                  type="button"
+                  onClick={() => removeCheckItem(node.id, item.id)}
+                  className="shrink-0 text-slate-500 hover:text-red-400"
+                  title="刪除步驟"
+                >
+                  ✕
+                </button>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-2 flex gap-2">
+            <input
+              value={newCheckItem}
+              onChange={(e) => setNewCheckItem(e.target.value)}
+              onCompositionStart={checkItemIme.onCompositionStart}
+              onCompositionEnd={checkItemIme.onCompositionEnd}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  if (checkItemIme.isImeEnter(e)) return;
+                  e.preventDefault();
+                  handleAddCheckItem();
+                }
+              }}
+              placeholder="新增驗證步驟…"
+              className="min-w-0 flex-1 rounded bg-slate-800 px-2 py-1.5 text-sm text-slate-200 outline-none focus:ring-1 focus:ring-sky-500"
+            />
+            <button
+              type="button"
+              onClick={handleAddCheckItem}
+              disabled={!newCheckItem.trim()}
+              className="shrink-0 rounded bg-sky-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-sky-500 disabled:opacity-40"
+            >
+              新增
+            </button>
+          </div>
         </section>
 
         <section>
