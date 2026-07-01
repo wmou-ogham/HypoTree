@@ -8,6 +8,14 @@ export type ResearchNodeData = ComputedNode & {
   childCount: number;
 };
 
+/** 畫布卡片備註預覽（單行、固定寬度內截斷） */
+function notePreview(note: string | undefined, maxLen = 22): string {
+  const text = (note ?? '').trim().replace(/\s+/g, ' ');
+  if (!text) return '';
+  if (text.length <= maxLen) return text;
+  return `${text.slice(0, maxLen)}…`;
+}
+
 function ResearchNodeViewImpl({ id, data, selected }: NodeProps) {
   const node = data as unknown as ResearchNodeData;
   const style = STATUS_STYLES[node.status];
@@ -34,22 +42,25 @@ function ResearchNodeViewImpl({ id, data, selected }: NodeProps) {
         >
           {style.icon}
         </span>
-        <span className="text-sm font-medium leading-snug break-words">{node.title}</span>
+        <span className="min-w-0 flex-1 truncate text-sm font-medium leading-snug">{node.title}</span>
       </div>
 
-      <div className="mt-1.5 flex items-center justify-between text-[10px] text-slate-400">
-        <span>{style.label}</span>
-        <span className="rounded bg-slate-900/60 px-1 py-0.5">進度 {progress}%</span>
+      <div className="mt-1.5 flex items-center gap-2 text-[10px] text-slate-400">
+        <span
+          className="min-w-0 flex-1 truncate"
+          title={node.note?.trim() || undefined}
+        >
+          {notePreview(node.note)}
+        </span>
+        <span className="shrink-0 rounded bg-slate-900/60 px-1 py-0.5">進度 {progress}%</span>
       </div>
 
-      {progress > 0 && (
-        <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-slate-800">
-          <div
-            className="h-full rounded-full bg-sky-500/80"
-            style={{ width: `${progress}%` }}
-          />
-        </div>
-      )}
+      <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-slate-800">
+        <div
+          className="h-full rounded-full bg-sky-500/80 transition-[width] duration-150"
+          style={{ width: `${progress}%` }}
+        />
+      </div>
 
       {isOrphaned && (
         <div className="mt-1 rounded bg-red-900/40 px-1.5 py-0.5 text-[10px] text-red-300">

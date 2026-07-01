@@ -34,15 +34,16 @@ export function layoutTree(nodes: ResearchNode[]): Record<string, { x: number; y
       const y = cursorY;
       cursorY += ROW_HEIGHT + NODE_VGAP;
       positions[id] = { x, y };
-      return { top: y, bottom: y };
+      return { top: y, bottom: y + ROW_HEIGHT };
     }
 
     const childRanges = children.map((cid) => place(cid, depth + 1));
     const top = childRanges[0].top;
     const bottom = childRanges[childRanges.length - 1].bottom;
-    const y = (top + bottom) / 2;
+    // React Flow 以左上角為 position；將子樹垂直中心對齊節點視覺中心
+    const y = (top + bottom - ROW_HEIGHT) / 2;
     positions[id] = { x, y };
-    return { top: y, bottom: y };
+    return { top: y, bottom: y + ROW_HEIGHT };
   };
 
   for (const root of roots) {

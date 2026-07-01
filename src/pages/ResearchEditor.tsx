@@ -19,6 +19,7 @@ const HOTKEY_HINTS: { keys: string; desc: string }[] = [
   { keys: 'X', desc: '已推翻' },
   { keys: 'V', desc: '已證實' },
   { keys: 'C', desc: '實驗中' },
+  { keys: 'Z', desc: '假設中' },
   { keys: '⌫', desc: '刪除' },
   { keys: '⌘Z', desc: '復原' },
 ];
