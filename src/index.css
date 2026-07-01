@@ -36,6 +36,13 @@ body {
   pointer-events: none;
 }
 
+/* 框選矩形（拖曳空白區域多選） */
+.react-flow__selection {
+  background: rgb(56 189 248 / 12%) !important;
+  border: 1px solid rgb(56 189 248 / 55%) !important;
+  border-radius: 2px;
+}
+
 .react-flow__attribution {
   display: none;
 }

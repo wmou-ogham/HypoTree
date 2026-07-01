@@ -96,13 +96,10 @@ export function EvidencePanel() {
   const selectedId = useTreeStore((s) => s.selectedId);
   const selectedIds = useTreeStore((s) => s.selectedIds);
   const editingId = useTreeStore((s) => s.editingId);
-  const titleCommitted = useTreeStore((s) => s.titleCommitted);
-  const noteFocusToken = useTreeStore((s) => s.noteFocusToken);
   const nodes = useTreeStore((s) => s.nodes);
-  const updateNode = useTreeStore((s) => s.updateNode);
   const setEditing = useTreeStore((s) => s.setEditing);
+  const updateNode = useTreeStore((s) => s.updateNode);
   const commitTitleEdit = useTreeStore((s) => s.commitTitleEdit);
-  const requestNoteFocus = useTreeStore((s) => s.requestNoteFocus);
   const setStatusForSelected = useTreeStore((s) => s.setStatusForSelected);
   const addEvidence = useTreeStore((s) => s.addEvidence);
   const updateEvidence = useTreeStore((s) => s.updateEvidence);
@@ -113,6 +110,15 @@ export function EvidencePanel() {
 
   const titleRef = useRef<HTMLInputElement>(null);
   const noteRef = useRef<HTMLTextAreaElement>(null);
+
+  const blurField = () => {
+    (document.activeElement as HTMLElement | null)?.blur();
+  };
+
+  const finishTitleEdit = () => {
+    commitTitleEdit();
+    blurField();
+  };
 
   const computed = computeDerivedStatus(nodes);
   const isMulti = selectedIds.length > 1;
@@ -143,12 +149,6 @@ export function EvidencePanel() {
       });
     }
   }, [editingId, selectedId]);
-
-  useEffect(() => {
-    if (noteFocusToken > 0 && selectedId === node?.id && noteRef.current) {
-      requestAnimationFrame(() => noteRef.current?.focus());
-    }
-  }, [noteFocusToken, selectedId, node?.id]);
 
   if (!selectedIds.length) {
     return (
@@ -250,39 +250,48 @@ export function EvidencePanel() {
   return (
     <aside className="flex h-full w-[340px] shrink-0 flex-col border-l border-slate-800 bg-slate-900/60">
       <div className="border-b border-slate-800 p-4">
-        <input
-          ref={titleRef}
-          value={node.title}
-          onChange={(e) => updateNode(node.id, { title: e.target.value })}
-          onBlur={() => {
-            if (editingId === node.id) commitTitleEdit();
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Tab' && !e.shiftKey) {
-              e.preventDefault();
-              commitTitleEdit();
-              addChild(node.id);
-              return;
-            }
-            if (e.key === 'Enter' && e.shiftKey) {
-              e.preventDefault();
-              commitTitleEdit();
-              addSibling(node.id);
-              return;
-            }
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              if (titleCommitted) {
-                requestNoteFocus();
-              } else {
+        {editingId === node.id ? (
+          <input
+            ref={titleRef}
+            value={node.title}
+            onChange={(e) => updateNode(node.id, { title: e.target.value })}
+            onBlur={() => commitTitleEdit()}
+            onKeyDown={(e) => {
+              if (e.key === 'Tab' && !e.shiftKey) {
+                e.preventDefault();
                 commitTitleEdit();
+                addChild(node.id);
+                return;
               }
-            }
-            if (e.key === 'Escape') setEditing(null);
-          }}
-          className="w-full rounded bg-slate-800 px-2 py-1.5 text-sm font-semibold text-slate-100 outline-none focus:ring-1 focus:ring-sky-500"
-          placeholder="節點標題"
-        />
+              if (e.key === 'Enter' && e.shiftKey) {
+                e.preventDefault();
+                commitTitleEdit();
+                addSibling(node.id);
+                return;
+              }
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                finishTitleEdit();
+                return;
+              }
+              if (e.key === 'Escape') {
+                e.preventDefault();
+                e.stopPropagation();
+                finishTitleEdit();
+              }
+            }}
+            className="w-full rounded bg-slate-800 px-2 py-1.5 text-sm font-semibold text-slate-100 outline-none focus:ring-1 focus:ring-sky-500"
+            placeholder="節點標題"
+          />
+        ) : (
+          <h2
+            className="cursor-text rounded px-2 py-1.5 text-sm font-semibold text-slate-100 hover:bg-slate-800/60"
+            onDoubleClick={() => setEditing(node.id)}
+            title="雙擊或按 Enter 編輯標題"
+          >
+            {node.title}
+          </h2>
+        )}
         {node.derived === 'orphaned' && (
           <div className="mt-2 rounded bg-red-900/40 px-2 py-1 text-xs text-red-300">
             ⛓️‍💥 此節點失去支撐：上游推論已被推翻
@@ -322,10 +331,17 @@ export function EvidencePanel() {
               if (e.key === 'Tab' && !e.shiftKey) {
                 e.preventDefault();
                 addChild(node.id);
+                return;
+              }
+              if (e.key === 'Escape') {
+                e.preventDefault();
+                e.stopPropagation();
+                blurField();
               }
             }}
             rows={3}
             placeholder="備註內容…"
+            tabIndex={-1}
             className="w-full resize-y rounded bg-slate-800 px-2 py-1.5 text-sm text-slate-200 outline-none focus:ring-1 focus:ring-sky-500"
           />
         </section>

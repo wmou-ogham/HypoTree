@@ -36,6 +36,7 @@ interface TreeState {
   computed: () => ComputedNode[];
 
   select: (id: string | null, options?: { shiftKey?: boolean }) => void;
+  selectMany: (ids: string[]) => void;
   setEditing: (id: string | null) => void;
   commitTitleEdit: () => void;
   requestNoteFocus: () => void;
@@ -196,7 +197,30 @@ export const useTreeStore = create<TreeState>((set, get) => {
         titleCommitted: false,
       });
     },
-    setEditing: (id) => set({ editingId: id, ...(id ? { titleCommitted: false } : {}) }),
+    selectMany: (ids) => {
+      if (!ids.length) {
+        set({ selectedId: null, selectedIds: [], editingId: null, titleCommitted: false });
+        return;
+      }
+      set({
+        selectedIds: ids,
+        selectedId: ids[ids.length - 1] ?? null,
+        editingId: null,
+        titleCommitted: false,
+      });
+    },
+    setEditing: (id) => {
+      if (!id) {
+        set({ editingId: null });
+        return;
+      }
+      set({
+        editingId: id,
+        selectedId: id,
+        selectedIds: [id],
+        titleCommitted: false,
+      });
+    },
     commitTitleEdit: () => set({ editingId: null, titleCommitted: true }),
     requestNoteFocus: () =>
       set((s) => ({ noteFocusToken: s.noteFocusToken + 1, titleCommitted: false })),
@@ -220,7 +244,13 @@ export const useTreeStore = create<TreeState>((set, get) => {
           ...partial,
         },
       ]);
-      set({ selectedId: id, selectedIds: [id], editingId: id, titleCommitted: false });
+      set({
+        selectedId: id,
+        selectedIds: [id],
+        editingId: id,
+        titleCommitted: false,
+        fitViewRequest: get().fitViewRequest + 1,
+      });
       return id;
     },
 

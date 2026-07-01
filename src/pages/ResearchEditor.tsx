@@ -10,9 +10,11 @@ import { researchPath } from '../lib/slug';
 
 const HOTKEY_HINTS: { keys: string; desc: string }[] = [
   { keys: 'Tab', desc: '子節點（下一級）' },
-  { keys: 'Enter', desc: '標題 → 備註' },
+  { keys: 'Enter', desc: '編輯 / 完成標題' },
+  { keys: 'Esc', desc: '完成編輯 / 取消選取' },
   { keys: '⇧Enter', desc: '同層節點' },
   { keys: '⇧Click', desc: '多選' },
+  { keys: '拖曳', desc: '框選' },
   { keys: 'X', desc: '已推翻' },
   { keys: 'V', desc: '已證實' },
   { keys: 'C', desc: '實驗中' },

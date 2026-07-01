@@ -10,9 +10,10 @@ function isTypingTarget(target: EventTarget | null): boolean {
 
 /**
  * 全域快速鍵：
- * - Enter：標題編輯 → 完成標題 → 聚焦備註
+ * - Enter：選取節點時進入標題編輯；編輯標題中按 Enter 完成編輯（保持選取）
  * - Shift+Enter：新增同層節點
  * - Tab：新增子節點（下一級）
+ * - Esc：編輯中完成並取消聚焦（保持選取）；否則取消選取
  * - X / V / C：已推翻 / 已證實 / 實驗中
  */
 export function useGlobalHotkeys() {
@@ -30,21 +31,28 @@ export function useGlobalHotkeys() {
   useHotkeys(
     'enter',
     () => {
-      const { selectedId, editingId, titleCommitted, setEditing, commitTitleEdit, requestNoteFocus } =
-        useTreeStore.getState();
-      if (!selectedId) return;
-
-      if (editingId === selectedId) {
-        commitTitleEdit();
-        return;
-      }
-      if (titleCommitted) {
-        requestNoteFocus();
-        return;
-      }
+      const { selectedId, editingId, setEditing } = useTreeStore.getState();
+      if (!selectedId || editingId === selectedId) return;
       setEditing(selectedId);
     },
     opts
+  );
+
+  useHotkeys(
+    'escape',
+    (event) => {
+      const { selectedIds, editingId, commitTitleEdit, select } = useTreeStore.getState();
+      if (!selectedIds.length) return;
+      const typing = isTypingTarget(event.target);
+
+      if (typing || editingId) {
+        if (editingId) commitTitleEdit();
+        if (event.target instanceof HTMLElement) event.target.blur();
+        return;
+      }
+      select(null);
+    },
+    { preventDefault: true, enableOnFormTags: true }
   );
 
   useHotkeys(

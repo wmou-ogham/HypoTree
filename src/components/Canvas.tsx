@@ -11,6 +11,7 @@ import {
 } from '@xyflow/react';
 import { useTreeStore } from '../store/useTreeStore';
 import { ResearchNodeView } from './nodes/ResearchNodeView';
+import { MarqueeSelection } from './MarqueeSelection';
 import { STATUS_STYLES } from '../lib/statusStyles';
 import { isShiftClick, useShiftHeld } from '../hooks/useShiftHeld';
 import type { ComputedNode } from '../types';
@@ -56,10 +57,18 @@ function hiddenSet(nodes: ComputedNode[]): Set<string> {
   return hidden;
 }
 
+function blurSidebarField() {
+  const el = document.activeElement;
+  if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+    el.blur();
+  }
+}
+
 export function Canvas() {
   const nodes = useTreeStore((s) => s.nodes);
   const selectedIds = useTreeStore((s) => s.selectedIds);
   const select = useTreeStore((s) => s.select);
+  const setEditing = useTreeStore((s) => s.setEditing);
   const shiftHeldRef = useShiftHeld();
 
   const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
@@ -92,48 +101,62 @@ export function Canvas() {
     [computed, hidden, childCount, selectedSet]
   );
 
-  const rfEdges: Edge[] = useMemo(() => {
-    const byId = new Map(computed.map((n) => [n.id, n]));
-    return computed
-      .filter((n) => n.parentId && byId.has(n.parentId))
-      .filter((n) => !hidden.has(n.id) && !hidden.has(n.parentId!))
-      .map((n) => {
-        const parent = byId.get(n.parentId!)!;
-        const orphaned = n.derived === 'orphaned';
-        const falsified = parent.status === 'falsified';
-        return {
-          id: `${n.parentId}-${n.id}`,
-          source: n.parentId!,
-          target: n.id,
-          type: 'smoothstep',
-          animated: parent.status === 'experimenting',
-          selectable: false,
-          focusable: false,
-          interactionWidth: 0,
-          className: orphaned
-            ? 'edge-orphaned'
-            : falsified
-            ? 'edge-falsified'
-            : '',
-          style: {
-            stroke: orphaned ? '#64748b' : STATUS_STYLES[parent.status].edgeStroke,
-            strokeWidth: 2,
-          },
-        } satisfies Edge;
-      });
-  }, [computed, hidden]);
+  const rfEdges: Edge[] = useMemo(
+    () => {
+      const byId = new Map(computed.map((n) => [n.id, n]));
+      return computed
+        .filter((n) => n.parentId && byId.has(n.parentId))
+        .filter((n) => !hidden.has(n.id) && !hidden.has(n.parentId!))
+        .map((n) => {
+          const parent = byId.get(n.parentId!)!;
+          const orphaned = n.derived === 'orphaned';
+          const falsified = parent.status === 'falsified';
+          return {
+            id: `${n.parentId}-${n.id}`,
+            source: n.parentId!,
+            target: n.id,
+            type: 'smoothstep',
+            animated: parent.status === 'experimenting',
+            selectable: false,
+            focusable: false,
+            interactionWidth: 0,
+            className: orphaned
+              ? 'edge-orphaned'
+              : falsified
+              ? 'edge-falsified'
+              : '',
+            style: {
+              stroke: orphaned ? '#64748b' : STATUS_STYLES[parent.status].edgeStroke,
+              strokeWidth: 2,
+            },
+          } satisfies Edge;
+        });
+    },
+    [computed, hidden]
+  );
 
   const onNodeClick: NodeMouseHandler = useCallback(
     (event, node) => {
+      blurSidebarField();
       select(node.id, { shiftKey: isShiftClick(event, shiftHeldRef) });
     },
     [select, shiftHeldRef]
+  );
+
+  const onNodeDoubleClick: NodeMouseHandler = useCallback(
+    (event, node) => {
+      if (isShiftClick(event, shiftHeldRef)) return;
+      blurSidebarField();
+      setEditing(node.id);
+    },
+    [setEditing, shiftHeldRef]
   );
 
   /** 按住 Shift 時點到空白或連線，不要清空既有複選 */
   const onPaneClick = useCallback(
     (event: React.MouseEvent) => {
       if (isShiftClick(event, shiftHeldRef)) return;
+      blurSidebarField();
       select(null);
     },
     [select, shiftHeldRef]
@@ -145,7 +168,9 @@ export function Canvas() {
       edges={rfEdges}
       nodeTypes={nodeTypes}
       onNodeClick={onNodeClick}
+      onNodeDoubleClick={onNodeDoubleClick}
       onPaneClick={onPaneClick}
+      zoomOnDoubleClick={false}
       fitView
       fitViewOptions={{ padding: 0.12, maxZoom: 1.2 }}
       minZoom={0.2}
@@ -156,7 +181,8 @@ export function Canvas() {
       elementsSelectable={false}
       selectionOnDrag={false}
       selectionKeyCode={null}
-      panOnDrag
+      panOnDrag={[1, 2]}
+      panActivationKeyCode="Space"
       defaultEdgeOptions={{ type: 'smoothstep', interactionWidth: 0 }}
     >
       <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#1e293b" />
@@ -166,6 +192,7 @@ export function Canvas() {
         style={{ bottom: '7.5rem', left: 12 }}
       />
       <FitViewController />
+      <MarqueeSelection />
     </ReactFlow>
   );
 }

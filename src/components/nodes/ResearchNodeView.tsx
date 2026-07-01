@@ -13,7 +13,6 @@ function ResearchNodeViewImpl({ id, data, selected }: NodeProps) {
   const style = STATUS_STYLES[node.status];
   const isOrphaned = node.derived === 'orphaned';
 
-  const setEditing = useTreeStore((s) => s.setEditing);
   const toggleCollapse = useTreeStore((s) => s.toggleCollapse);
 
   const progress = node.progress ?? 0;
@@ -21,12 +20,11 @@ function ResearchNodeViewImpl({ id, data, selected }: NodeProps) {
   return (
     <div
       className={[
-        'relative rounded-xl border-2 px-3 py-2 shadow-lg transition-all w-[240px]',
+        'nopan nodrag relative rounded-xl border-2 px-3 py-2 shadow-lg transition-all w-[240px]',
         style.className,
         selected ? 'ring-2 ring-sky-400 ring-offset-2 ring-offset-slate-900' : '',
         isOrphaned ? 'opacity-40 saturate-50' : '',
       ].join(' ')}
-      onDoubleClick={() => setEditing(id)}
       title={isOrphaned ? '失去支撐：此推論的上游已被推翻' : node.note}
     >
       <Handle type="target" position={Position.Left} className="!bg-slate-500" />
