@@ -12,7 +12,7 @@ const HOTKEY_HINTS: { keys: string; desc: string }[] = [
   { keys: 'Tab', desc: '子節點（下一級）' },
   { keys: '⇧Tab', desc: '父節點' },
   { keys: '↑↓←→', desc: '移動選取' },
-  { keys: '⇧↑↓←→', desc: '微調卡片位置' },
+  { keys: '⇧↑↓←→', desc: '調整順序 / 層級' },
   { keys: 'Enter', desc: '編輯 / 完成標題' },
   { keys: 'Esc', desc: '完成編輯 / 取消選取' },
   { keys: '⇧Enter', desc: '同層節點' },

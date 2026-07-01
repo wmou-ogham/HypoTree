@@ -48,8 +48,6 @@ export interface ResearchNode {
   /** 父節點 id；root 節點為 null */
   parentId: string | null;
   position: { x: number; y: number };
-  /** 相對自動佈局的手動位移（Shift+方向鍵） */
-  positionOffset?: { x: number; y: number };
 }
 
 /** 含衍生狀態的節點（推論崩塌計算後產生，不落地儲存） */

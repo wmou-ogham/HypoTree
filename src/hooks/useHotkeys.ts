@@ -15,7 +15,7 @@ function isTypingTarget(target: EventTarget | null): boolean {
  * - Tab：新增子節點（下一級）
  * - Shift+Tab：選取父節點
  * - 方向鍵：在可見節點間移動（左＝父、右＝子、上／下＝同層兄弟）
- * - Shift+方向鍵：微調選取卡片位置
+ * - Shift+方向鍵：調整選取節點在同層的順序（上／下）或層級（左＝升一層、右＝降一層）
  * - Esc：編輯中完成並取消聚焦（保持選取）；否則取消選取
  * - X / V / C / Z：已推翻 / 已證實 / 實驗中 / 假設中
  */
@@ -44,10 +44,10 @@ export function useGlobalHotkeys() {
   useHotkeys('left', () => useTreeStore.getState().selectNeighbor('left'), opts);
   useHotkeys('right', () => useTreeStore.getState().selectNeighbor('right'), opts);
 
-  useHotkeys('shift+up', () => useTreeStore.getState().nudgeSelectedPosition('up'), opts);
-  useHotkeys('shift+down', () => useTreeStore.getState().nudgeSelectedPosition('down'), opts);
-  useHotkeys('shift+left', () => useTreeStore.getState().nudgeSelectedPosition('left'), opts);
-  useHotkeys('shift+right', () => useTreeStore.getState().nudgeSelectedPosition('right'), opts);
+  useHotkeys('shift+up', () => useTreeStore.getState().moveSelectedInTree('up'), opts);
+  useHotkeys('shift+down', () => useTreeStore.getState().moveSelectedInTree('down'), opts);
+  useHotkeys('shift+left', () => useTreeStore.getState().moveSelectedInTree('left'), opts);
+  useHotkeys('shift+right', () => useTreeStore.getState().moveSelectedInTree('right'), opts);
 
   useHotkeys(
     'enter',
