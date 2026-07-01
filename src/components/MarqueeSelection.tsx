@@ -1,10 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useReactFlow } from '@xyflow/react';
+import { useEffect, useRef, useState } from 'react';
+import { useReactFlow, type Node } from '@xyflow/react';
 import { useTreeStore } from '../store/useTreeStore';
-import { computeDerivedStatus } from '../lib/inference';
 import { LAYOUT_CONSTS } from '../lib/layout';
 import { isShiftClick, useShiftHeld } from '../hooks/useShiftHeld';
-import type { ComputedNode } from '../types';
 
 const DRAG_THRESHOLD = 4;
 const NODE_W = LAYOUT_CONSTS.NODE_WIDTH;
@@ -16,28 +14,10 @@ function rectsIntersect(a: Rect, b: Rect): boolean {
   return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 }
 
-/** 與 Canvas 相同：收合節點的子樹不顯示 */
-function hiddenSet(nodes: ComputedNode[]): Set<string> {
-  const byId = new Map(nodes.map((n) => [n.id, n]));
-  const childrenOf = new Map<string, string[]>();
-  for (const n of nodes) {
-    if (n.parentId) {
-      const arr = childrenOf.get(n.parentId) ?? [];
-      arr.push(n.id);
-      childrenOf.set(n.parentId, arr);
-    }
-  }
-  const hidden = new Set<string>();
-  const hideSubtree = (id: string) => {
-    for (const cid of childrenOf.get(id) ?? []) {
-      hidden.add(cid);
-      hideSubtree(cid);
-    }
-  };
-  for (const n of nodes) {
-    if (n.collapsed && byId.has(n.id)) hideSubtree(n.id);
-  }
-  return hidden;
+function nodeRect(n: Node): Rect {
+  const w = n.measured?.width ?? NODE_W;
+  const h = n.measured?.height ?? NODE_H;
+  return { x: n.position.x, y: n.position.y, w, h };
 }
 
 function blurSidebarField() {
@@ -47,12 +27,13 @@ function blurSidebarField() {
   }
 }
 
+/** 框選結束後略過一次 pane click，避免 onPaneClick 清空選取 */
+export const skipNextPaneClickRef = { current: false };
+
 /** 在空白處拖曳框選節點（不依賴 React Flow 內建 selection，避免受控選取無限迴圈） */
 export function MarqueeSelection() {
-  const storeNodes = useTreeStore((s) => s.nodes);
-  const selectedIds = useTreeStore((s) => s.selectedIds);
   const selectMany = useTreeStore((s) => s.selectMany);
-  const { screenToFlowPosition } = useReactFlow();
+  const { screenToFlowPosition, getNodes } = useReactFlow();
   const shiftHeldRef = useShiftHeld();
 
   const [screenRect, setScreenRect] = useState<{
@@ -68,22 +49,17 @@ export function MarqueeSelection() {
     moved: boolean;
   } | null>(null);
   const spaceHeldRef = useRef(false);
-  const selectedIdsRef = useRef(selectedIds);
-  selectedIdsRef.current = selectedIds;
+  const selectedIdsRef = useRef(useTreeStore.getState().selectedIds);
+  const rfApiRef = useRef({ screenToFlowPosition, getNodes });
 
-  const nodeBounds = useMemo(() => {
-    const computed = computeDerivedStatus(storeNodes);
-    const hidden = hiddenSet(computed);
-    return computed
-      .filter((n) => !hidden.has(n.id))
-      .map((n) => ({
-        id: n.id,
-        x: n.position.x,
-        y: n.position.y,
-        w: NODE_W,
-        h: NODE_H,
-      }));
-  }, [storeNodes]);
+  selectedIdsRef.current = useTreeStore.getState().selectedIds;
+  rfApiRef.current = { screenToFlowPosition, getNodes };
+
+  useEffect(() => {
+    return useTreeStore.subscribe((s) => {
+      selectedIdsRef.current = s.selectedIds;
+    });
+  }, []);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -109,11 +85,17 @@ export function MarqueeSelection() {
     const getPane = () =>
       document.querySelector('.react-flow__pane') as HTMLElement | null;
 
+    const isMarqueeStart = (target: EventTarget | null) => {
+      if (!(target instanceof Element)) return false;
+      if (target.closest('.react-flow__node')) return false;
+      const pane = getPane();
+      return pane !== null && pane.contains(target);
+    };
+
     const onPointerDown = (e: PointerEvent) => {
       if (e.button !== 0) return;
       if (spaceHeldRef.current) return;
-      const pane = getPane();
-      if (!pane || e.target !== pane) return;
+      if (!isMarqueeStart(e.target)) return;
 
       dragRef.current = { startX: e.clientX, startY: e.clientY, moved: false };
     };
@@ -143,8 +125,11 @@ export function MarqueeSelection() {
       setScreenRect(null);
       if (!drag?.moved) return;
 
-      const flowStart = screenToFlowPosition({ x: drag.startX, y: drag.startY });
-      const flowEnd = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+      skipNextPaneClickRef.current = true;
+
+      const { screenToFlowPosition: toFlow, getNodes: nodes } = rfApiRef.current;
+      const flowStart = toFlow({ x: drag.startX, y: drag.startY });
+      const flowEnd = toFlow({ x: e.clientX, y: e.clientY });
       const sel: Rect = {
         x: Math.min(flowStart.x, flowEnd.x),
         y: Math.min(flowStart.y, flowEnd.y),
@@ -152,7 +137,9 @@ export function MarqueeSelection() {
         h: Math.abs(flowEnd.y - flowStart.y),
       };
 
-      const hitIds = nodeBounds.filter((n) => rectsIntersect(sel, n)).map((n) => n.id);
+      const hitIds = nodes()
+        .filter((n) => rectsIntersect(sel, nodeRect(n)))
+        .map((n) => n.id);
 
       blurSidebarField();
       if (isShiftClick(e, shiftHeldRef)) {
@@ -182,7 +169,7 @@ export function MarqueeSelection() {
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', onPointerUp);
     };
-  }, [nodeBounds, screenToFlowPosition, selectMany, shiftHeldRef]);
+  }, [selectMany, shiftHeldRef]);
 
   if (!screenRect) return null;
 

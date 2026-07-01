@@ -11,7 +11,7 @@ import {
 } from '@xyflow/react';
 import { useTreeStore } from '../store/useTreeStore';
 import { ResearchNodeView } from './nodes/ResearchNodeView';
-import { MarqueeSelection } from './MarqueeSelection';
+import { MarqueeSelection, skipNextPaneClickRef } from './MarqueeSelection';
 import { STATUS_STYLES } from '../lib/statusStyles';
 import { isShiftClick, useShiftHeld } from '../hooks/useShiftHeld';
 import type { ComputedNode } from '../types';
@@ -155,6 +155,10 @@ export function Canvas() {
   /** 按住 Shift 時點到空白或連線，不要清空既有複選 */
   const onPaneClick = useCallback(
     (event: React.MouseEvent) => {
+      if (skipNextPaneClickRef.current) {
+        skipNextPaneClickRef.current = false;
+        return;
+      }
       if (isShiftClick(event, shiftHeldRef)) return;
       blurSidebarField();
       select(null);

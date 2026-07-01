@@ -10,6 +10,7 @@ import { researchPath } from '../lib/slug';
 
 const HOTKEY_HINTS: { keys: string; desc: string }[] = [
   { keys: 'Tab', desc: '子節點（下一級）' },
+  { keys: '⇧Tab', desc: '父節點' },
   { keys: 'Enter', desc: '編輯 / 完成標題' },
   { keys: 'Esc', desc: '完成編輯 / 取消選取' },
   { keys: '⇧Enter', desc: '同層節點' },

@@ -37,6 +37,7 @@ interface TreeState {
 
   select: (id: string | null, options?: { shiftKey?: boolean }) => void;
   selectMany: (ids: string[]) => void;
+  selectParent: () => void;
   setEditing: (id: string | null) => void;
   commitTitleEdit: () => void;
   requestNoteFocus: () => void;
@@ -205,6 +206,18 @@ export const useTreeStore = create<TreeState>((set, get) => {
       set({
         selectedIds: ids,
         selectedId: ids[ids.length - 1] ?? null,
+        editingId: null,
+        titleCommitted: false,
+      });
+    },
+    selectParent: () => {
+      const { selectedId, nodes } = get();
+      if (!selectedId) return;
+      const node = nodes.find((n) => n.id === selectedId);
+      if (!node?.parentId) return;
+      set({
+        selectedId: node.parentId,
+        selectedIds: [node.parentId],
         editingId: null,
         titleCommitted: false,
       });

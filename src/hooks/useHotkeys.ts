@@ -13,6 +13,7 @@ function isTypingTarget(target: EventTarget | null): boolean {
  * - Enter：選取節點時進入標題編輯；編輯標題中按 Enter 完成編輯（保持選取）
  * - Shift+Enter：新增同層節點
  * - Tab：新增子節點（下一級）
+ * - Shift+Tab：選取父節點
  * - Esc：編輯中完成並取消聚焦（保持選取）；否則取消選取
  * - X / V / C：已推翻 / 已證實 / 實驗中
  */
@@ -24,6 +25,14 @@ export function useGlobalHotkeys() {
     () => {
       const { selectedId, addChild } = useTreeStore.getState();
       if (selectedId) addChild(selectedId);
+    },
+    opts
+  );
+
+  useHotkeys(
+    'shift+tab',
+    () => {
+      useTreeStore.getState().selectParent();
     },
     opts
   );

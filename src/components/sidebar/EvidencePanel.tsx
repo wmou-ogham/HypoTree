@@ -98,6 +98,7 @@ export function EvidencePanel() {
   const editingId = useTreeStore((s) => s.editingId);
   const nodes = useTreeStore((s) => s.nodes);
   const setEditing = useTreeStore((s) => s.setEditing);
+  const selectParent = useTreeStore((s) => s.selectParent);
   const updateNode = useTreeStore((s) => s.updateNode);
   const commitTitleEdit = useTreeStore((s) => s.commitTitleEdit);
   const setStatusForSelected = useTreeStore((s) => s.setStatusForSelected);
@@ -257,6 +258,12 @@ export function EvidencePanel() {
             onChange={(e) => updateNode(node.id, { title: e.target.value })}
             onBlur={() => commitTitleEdit()}
             onKeyDown={(e) => {
+              if (e.key === 'Tab' && e.shiftKey) {
+                e.preventDefault();
+                commitTitleEdit();
+                selectParent();
+                return;
+              }
               if (e.key === 'Tab' && !e.shiftKey) {
                 e.preventDefault();
                 commitTitleEdit();
@@ -328,6 +335,12 @@ export function EvidencePanel() {
             value={node.note ?? ''}
             onChange={(e) => updateNode(node.id, { note: e.target.value })}
             onKeyDown={(e) => {
+              if (e.key === 'Tab' && e.shiftKey) {
+                e.preventDefault();
+                blurField();
+                selectParent();
+                return;
+              }
               if (e.key === 'Tab' && !e.shiftKey) {
                 e.preventDefault();
                 addChild(node.id);
