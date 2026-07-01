@@ -104,6 +104,7 @@ export function MarqueeSelection() {
 
     const onPointerDown = (e: PointerEvent) => {
       if (e.button !== 0) return;
+      if (e.pointerType === 'touch') return; // 觸控裝置讓 ReactFlow 處理平移
       if (spaceHeldRef.current) return;
       if (!isMarqueeStart(e.target)) return;
 

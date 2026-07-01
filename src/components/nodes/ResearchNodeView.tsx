@@ -82,7 +82,7 @@ function ResearchNodeViewImpl({ id, data, selected }: NodeProps) {
             e.stopPropagation();
             useTreeStore.getState().toggleCollapse(id);
           }}
-          className="absolute -right-3 top-1/2 z-10 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full border border-slate-600 bg-slate-800 text-xs text-slate-200 hover:bg-slate-700"
+          className="absolute -right-3 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-slate-600 bg-slate-800 text-xs text-slate-200 hover:bg-slate-700 active:bg-slate-600"
           title={node.collapsed ? '展開子節點' : '收合子節點'}
         >
           {node.collapsed ? `+${node.childCount}` : '−'}

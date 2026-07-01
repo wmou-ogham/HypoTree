@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo } from 'react';
+import { useIsMobile } from '../hooks/useIsMobile';
 import {
   Background,
   BackgroundVariant,
@@ -46,6 +47,7 @@ export function Canvas() {
   const select = useTreeStore((s) => s.select);
   const setEditing = useTreeStore((s) => s.setEditing);
   const shiftHeldRef = useShiftHeld();
+  const isMobile = useIsMobile();
 
   const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
 
@@ -166,7 +168,7 @@ export function Canvas() {
       <Controls
         showInteractive={false}
         position="bottom-left"
-        style={{ bottom: '7.5rem', left: 12 }}
+        style={{ bottom: isMobile ? '1rem' : '7.5rem', left: 12 }}
       />
       <FitViewController />
       <MarqueeSelection />

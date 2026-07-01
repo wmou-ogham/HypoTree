@@ -6,6 +6,7 @@ import { Canvas } from '../components/Canvas';
 import { EvidencePanel } from '../components/sidebar/EvidencePanel';
 import { useTreeStore } from '../store/useTreeStore';
 import { useGlobalHotkeys } from '../hooks/useHotkeys';
+import { useIsMobile } from '../hooks/useIsMobile';
 import { researchPath } from '../lib/slug';
 
 const HOTKEY_HINTS: { keys: string; desc: string }[] = [
@@ -46,6 +47,16 @@ export function ResearchEditor() {
   const loaded = useTreeStore((s) => s.loaded);
   const loadResearch = useTreeStore((s) => s.loadResearch);
   const resetEditorState = useTreeStore((s) => s.resetEditorState);
+  const selectedId = useTreeStore((s) => s.selectedId);
+
+  const isMobile = useIsMobile();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  /** 手機上選取卡片時自動展開側欄；取消選取時關閉 */
+  useEffect(() => {
+    if (!isMobile) return;
+    setSidebarOpen(!!selectedId);
+  }, [isMobile, selectedId]);
 
   const [notFound, setNotFound] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -111,7 +122,8 @@ export function ResearchEditor() {
               載入中…
             </div>
           )}
-          <div className="pointer-events-none absolute bottom-3 left-3 z-10 flex flex-wrap gap-2">
+          {/* 快捷鍵提示：手機隱藏 */}
+          <div className="pointer-events-none absolute bottom-3 left-3 z-10 hidden flex-wrap gap-2 md:flex">
             {HOTKEY_HINTS.map((h) => (
               <span
                 key={h.keys}
@@ -124,8 +136,18 @@ export function ResearchEditor() {
               </span>
             ))}
           </div>
+          {/* 手機：選取節點時顯示「詳情」懸浮按鈕（若側欄已關閉） */}
+          {isMobile && selectedId && !sidebarOpen && (
+            <button
+              type="button"
+              onClick={() => setSidebarOpen(true)}
+              className="absolute bottom-4 right-4 z-20 flex items-center gap-1.5 rounded-full bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg active:bg-sky-500"
+            >
+              ✏️ 詳情
+            </button>
+          )}
         </main>
-        <EvidencePanel />
+        <EvidencePanel open={isMobile ? sidebarOpen : true} onClose={() => setSidebarOpen(false)} />
       </div>
     </div>
   );

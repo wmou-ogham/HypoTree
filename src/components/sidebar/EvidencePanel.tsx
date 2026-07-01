@@ -92,7 +92,7 @@ function StatusGrid({
   );
 }
 
-export function EvidencePanel() {
+export function EvidencePanel({ open, onClose }: { open: boolean; onClose: () => void }) {
   const selectedId = useTreeStore((s) => s.selectedId);
   const selectedIds = useTreeStore((s) => s.selectedIds);
   const editingId = useTreeStore((s) => s.editingId);
@@ -158,70 +158,34 @@ export function EvidencePanel() {
     }
   }, [editingId, selectedId]);
 
-  if (!selectedIds.length) {
-    return (
-      <aside className="flex h-full w-[340px] shrink-0 flex-col items-center justify-center border-l border-slate-800 bg-slate-900/60 p-6 text-center text-sm text-slate-500">
-        <div className="mb-2 text-3xl">🔬</div>
-        點選一個節點以檢視並編輯
-        <br />
-        <span className="mt-2 text-xs text-slate-600">按住 Shift 點擊可多選，批次修改狀態</span>
-      </aside>
-    );
-  }
+  /** 共用 aside 樣式：桌機固定側欄 / 手機右側滑入 Drawer */
+  const asideCls = [
+    'flex shrink-0 flex-col border-l border-slate-800 bg-slate-900',
+    // 手機：fixed 覆蓋層，從右側滑入
+    'fixed inset-y-0 right-0 z-50 w-[88vw] max-w-[340px]',
+    'transition-transform duration-300 ease-in-out',
+    open ? 'translate-x-0' : 'translate-x-full',
+    // 桌機：回到正常 flex 側欄
+    'md:relative md:inset-auto md:z-auto md:h-full md:translate-x-0 md:w-[340px] md:max-w-none',
+  ].join(' ');
 
-  if (isMulti) {
-    return (
-      <aside className="flex h-full w-[340px] shrink-0 flex-col border-l border-slate-800 bg-slate-900/60">
-        <div className="border-b border-slate-800 p-4">
-          <h2 className="text-sm font-semibold text-slate-100">
-            已選取 {selectedIds.length} 個節點
-          </h2>
-          <p className="mt-1 text-xs text-slate-500">點選下方狀態以批次套用</p>
-        </div>
-        <div className="flex-1 space-y-4 overflow-y-auto p-4">
-          <StatusGrid
-            activeStatus={uniformStatus}
-            onPick={setStatusForSelected}
-            hint={
-              uniformStatus === null
-                ? '選取的節點狀態不一致，點選以統一設定'
-                : undefined
-            }
-          />
-          <section>
-            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-              選取清單
-            </h3>
-            <ul className="max-h-64 space-y-1 overflow-y-auto rounded-lg border border-slate-800 bg-slate-900/40 p-2">
-              {selectedNodes.map((n) => (
-                <li
-                  key={n.id}
-                  className="flex items-center justify-between gap-2 rounded px-2 py-1 text-xs text-slate-300"
-                >
-                  <span className="truncate">{n.title}</span>
-                  <span
-                    className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] ${STATUS_STYLES[n.status].dot} text-slate-900`}
-                  >
-                    {STATUS_STYLES[n.status].label}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </section>
-        </div>
-      </aside>
-    );
-  }
-
-  if (!node) {
-    return (
-      <aside className="flex h-full w-[340px] shrink-0 flex-col items-center justify-center border-l border-slate-800 bg-slate-900/60 p-6 text-center text-sm text-slate-500">
-        找不到選取的節點
-      </aside>
-    );
-  }
+  /** 手機關閉按鈕 */
+  const mobileCloseBtn = (
+    <div className="flex shrink-0 items-center justify-between border-b border-slate-800 px-4 py-2.5 md:hidden">
+      <span className="text-sm font-semibold text-slate-200">節點詳情</span>
+      <button
+        type="button"
+        onClick={onClose}
+        className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-700 text-slate-300 hover:bg-slate-600 active:bg-slate-500"
+        aria-label="關閉"
+      >
+        ✕
+      </button>
+    </div>
+  );
 
   const handleAddEvidence = () => {
+    if (!node) return;
     if (!newValue.trim() && !newAnnotation.trim() && newType !== 'image') return;
     addEvidence(node.id, {
       type: newType,
@@ -235,16 +199,18 @@ export function EvidencePanel() {
   };
 
   const handleAddCheckItem = () => {
+    if (!node) return;
     if (!newCheckItem.trim()) return;
     addCheckItem(node.id, newCheckItem);
     setNewCheckItem('');
   };
 
-  const checkItems = node.checkItems ?? [];
+  const checkItems = node?.checkItems ?? [];
   const checkDone = checkItems.filter((i) => i.done).length;
-  const progress = node.progress ?? 0;
+  const progress = node?.progress ?? 0;
 
   const handleImageUpload = async (file: File) => {
+    if (!node) return;
     const key = await saveBlob(file);
     addEvidence(node.id, {
       type: 'image',
@@ -266,7 +232,60 @@ export function EvidencePanel() {
   };
 
   return (
-    <aside className="flex h-full w-[340px] shrink-0 flex-col border-l border-slate-800 bg-slate-900/60">
+    <>
+      {/* 手機遮罩 */}
+      <div
+        className={`fixed inset-0 z-40 bg-black/60 transition-opacity duration-300 md:hidden ${open ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+        onClick={onClose}
+        aria-hidden
+      />
+      <aside className={asideCls}>
+        {mobileCloseBtn}
+
+        {/* ── 無選取 ── */}
+        {!selectedIds.length ? (
+          <div className="flex flex-1 flex-col items-center justify-center p-6 text-center text-sm text-slate-500">
+            <div className="mb-2 text-3xl">🔬</div>
+            點選一個節點以檢視並編輯
+            <br />
+            <span className="mt-2 text-xs text-slate-600">按住 Shift 點擊可多選，批次修改狀態</span>
+          </div>
+        ) : isMulti ? (
+          /* ── 多選 ── */
+          <>
+            <div className="border-b border-slate-800 p-4">
+              <h2 className="text-sm font-semibold text-slate-100">已選取 {selectedIds.length} 個節點</h2>
+              <p className="mt-1 text-xs text-slate-500">點選下方狀態以批次套用</p>
+            </div>
+            <div className="flex-1 space-y-4 overflow-y-auto p-4">
+              <StatusGrid
+                activeStatus={uniformStatus}
+                onPick={setStatusForSelected}
+                hint={uniformStatus === null ? '選取的節點狀態不一致，點選以統一設定' : undefined}
+              />
+              <section>
+                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">選取清單</h3>
+                <ul className="max-h-64 space-y-1 overflow-y-auto rounded-lg border border-slate-800 bg-slate-900/40 p-2">
+                  {selectedNodes.map((n) => (
+                    <li key={n.id} className="flex items-center justify-between gap-2 rounded px-2 py-1 text-xs text-slate-300">
+                      <span className="truncate">{n.title}</span>
+                      <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] ${STATUS_STYLES[n.status].dot} text-slate-900`}>
+                        {STATUS_STYLES[n.status].label}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            </div>
+          </>
+        ) : !node ? (
+          /* ── 找不到節點 ── */
+          <div className="flex flex-1 flex-col items-center justify-center p-6 text-center text-sm text-slate-500">
+            找不到選取的節點
+          </div>
+        ) : (
+          /* ── 單節點編輯 ── */
+          <>
       <div className="border-b border-slate-800 p-4">
         {editingId === node.id ? (
           <input
@@ -316,8 +335,8 @@ export function EvidencePanel() {
         ) : (
           <h2
             className="cursor-text rounded px-2 py-1.5 text-sm font-semibold text-slate-100 hover:bg-slate-800/60"
-            onDoubleClick={() => setEditing(node.id)}
-            title="雙擊或按 Enter 編輯標題"
+            onClick={() => setEditing(node.id)}
+            title="點擊或按 Enter 編輯標題"
           >
             {node.title}
           </h2>
@@ -580,17 +599,20 @@ export function EvidencePanel() {
       <div className="grid grid-cols-2 gap-2 border-t border-slate-800 p-3">
         <button
           onClick={() => addChild(node.id)}
-          className="rounded bg-slate-700 px-2 py-1.5 text-xs text-slate-200 hover:bg-slate-600"
+          className="rounded bg-slate-700 px-2 py-1.5 text-xs text-slate-200 hover:bg-slate-600 active:bg-slate-500"
         >
           + 子節點
         </button>
         <button
           onClick={() => removeNode(node.id)}
-          className="rounded bg-red-900/60 px-2 py-1.5 text-xs text-red-200 hover:bg-red-800"
+          className="rounded bg-red-900/60 px-2 py-1.5 text-xs text-red-200 hover:bg-red-800 active:bg-red-700"
         >
           刪除
         </button>
       </div>
-    </aside>
+          </>
+        )}
+      </aside>
+    </>
   );
 }
