@@ -13,14 +13,12 @@ function ResearchNodeViewImpl({ id, data, selected }: NodeProps) {
   const style = STATUS_STYLES[node.status];
   const isOrphaned = node.derived === 'orphaned';
 
-  const toggleCollapse = useTreeStore((s) => s.toggleCollapse);
-
   const progress = node.progress ?? 0;
 
   return (
     <div
       className={[
-        'nopan nodrag relative rounded-xl border-2 px-3 py-2 shadow-lg transition-all w-[240px]',
+        'nopan nodrag relative rounded-xl border-2 px-3 py-2 shadow-lg w-[240px]',
         style.className,
         selected ? 'ring-2 ring-sky-400 ring-offset-2 ring-offset-slate-900' : '',
         isOrphaned ? 'opacity-40 saturate-50' : '',
@@ -47,7 +45,7 @@ function ResearchNodeViewImpl({ id, data, selected }: NodeProps) {
       {progress > 0 && (
         <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-slate-800">
           <div
-            className="h-full rounded-full bg-sky-500/80 transition-all"
+            className="h-full rounded-full bg-sky-500/80"
             style={{ width: `${progress}%` }}
           />
         </div>
@@ -71,7 +69,7 @@ function ResearchNodeViewImpl({ id, data, selected }: NodeProps) {
           onMouseDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation();
-            toggleCollapse(id);
+            useTreeStore.getState().toggleCollapse(id);
           }}
           className="absolute -right-3 top-1/2 z-10 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full border border-slate-600 bg-slate-800 text-xs text-slate-200 hover:bg-slate-700"
           title={node.collapsed ? '展開子節點' : '收合子節點'}
@@ -83,4 +81,8 @@ function ResearchNodeViewImpl({ id, data, selected }: NodeProps) {
   );
 }
 
-export const ResearchNodeView = memo(ResearchNodeViewImpl);
+function nodePropsEqual(prev: NodeProps, next: NodeProps) {
+  return prev.id === next.id && prev.selected === next.selected && prev.data === next.data;
+}
+
+export const ResearchNodeView = memo(ResearchNodeViewImpl, nodePropsEqual);

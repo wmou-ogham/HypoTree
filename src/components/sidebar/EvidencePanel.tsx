@@ -3,7 +3,6 @@ import type { ComputedNode, EvidenceType, NodeStatus } from '../../types';
 import { useTreeStore } from '../../store/useTreeStore';
 import { STATUS_ORDER, STATUS_STYLES } from '../../lib/statusStyles';
 import { getBlobUrl, saveBlob } from '../../lib/persistence';
-import { computeDerivedStatus } from '../../lib/inference';
 
 const EVIDENCE_TYPE_LABELS: Record<EvidenceType, string> = {
   citation: '文獻引用',
@@ -96,7 +95,7 @@ export function EvidencePanel() {
   const selectedId = useTreeStore((s) => s.selectedId);
   const selectedIds = useTreeStore((s) => s.selectedIds);
   const editingId = useTreeStore((s) => s.editingId);
-  const nodes = useTreeStore((s) => s.nodes);
+  const computedNodes = useTreeStore((s) => s.computedNodes);
   const setEditing = useTreeStore((s) => s.setEditing);
   const selectParent = useTreeStore((s) => s.selectParent);
   const updateNode = useTreeStore((s) => s.updateNode);
@@ -121,7 +120,7 @@ export function EvidencePanel() {
     blurField();
   };
 
-  const computed = computeDerivedStatus(nodes);
+  const computed = computedNodes;
   const isMulti = selectedIds.length > 1;
   const node = !isMulti
     ? (computed.find((n) => n.id === selectedIds[0]) as ComputedNode | undefined)

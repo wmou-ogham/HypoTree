@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { useReactFlow, type Node } from '@xyflow/react';
 import { useTreeStore } from '../store/useTreeStore';
 import { LAYOUT_CONSTS } from '../lib/layout';
@@ -36,13 +36,7 @@ export function MarqueeSelection() {
   const { screenToFlowPosition, getNodes } = useReactFlow();
   const shiftHeldRef = useShiftHeld();
 
-  const [screenRect, setScreenRect] = useState<{
-    left: number;
-    top: number;
-    width: number;
-    height: number;
-  } | null>(null);
-
+  const overlayRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{
     startX: number;
     startY: number;
@@ -85,6 +79,22 @@ export function MarqueeSelection() {
     const getPane = () =>
       document.querySelector('.react-flow__pane') as HTMLElement | null;
 
+    const updateOverlay = (left: number, top: number, width: number, height: number) => {
+      const el = overlayRef.current;
+      if (!el) return;
+      if (width <= 0 && height <= 0) {
+        el.style.display = 'none';
+        return;
+      }
+      el.style.display = 'block';
+      el.style.left = `${left}px`;
+      el.style.top = `${top}px`;
+      el.style.width = `${width}px`;
+      el.style.height = `${height}px`;
+    };
+
+    const hideOverlay = () => updateOverlay(0, 0, 0, 0);
+
     const isMarqueeStart = (target: EventTarget | null) => {
       if (!(target instanceof Element)) return false;
       if (target.closest('.react-flow__node')) return false;
@@ -111,18 +121,13 @@ export function MarqueeSelection() {
       drag.moved = true;
       const left = Math.min(drag.startX, e.clientX);
       const top = Math.min(drag.startY, e.clientY);
-      setScreenRect({
-        left,
-        top,
-        width: Math.abs(e.clientX - drag.startX),
-        height: Math.abs(e.clientY - drag.startY),
-      });
+      updateOverlay(left, top, Math.abs(e.clientX - drag.startX), Math.abs(e.clientY - drag.startY));
     };
 
     const onPointerUp = (e: PointerEvent) => {
       const drag = dragRef.current;
       dragRef.current = null;
-      setScreenRect(null);
+      hideOverlay();
       if (!drag?.moved) return;
 
       skipNextPaneClickRef.current = true;
@@ -171,17 +176,10 @@ export function MarqueeSelection() {
     };
   }, [selectMany, shiftHeldRef]);
 
-  if (!screenRect) return null;
-
   return (
     <div
-      className="pointer-events-none fixed z-10 border border-sky-400/60 bg-sky-400/10"
-      style={{
-        left: screenRect.left,
-        top: screenRect.top,
-        width: screenRect.width,
-        height: screenRect.height,
-      }}
+      ref={overlayRef}
+      className="pointer-events-none fixed z-10 hidden border border-sky-400/60 bg-sky-400/10"
     />
   );
 }

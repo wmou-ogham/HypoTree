@@ -19,6 +19,8 @@ interface TreeState {
   researchSlug: string | null;
   docName: string;
   nodes: ResearchNode[];
+  /** 快取推論衍生狀態，避免各元件重複計算 */
+  computedNodes: ComputedNode[];
   selectedId: string | null;
   selectedIds: string[];
   loaded: boolean;
@@ -81,22 +83,45 @@ export const useTreeStore = create<TreeState>((set, get) => {
     return nodes.map((n) => (pos[n.id] ? { ...n, position: pos[n.id] } : n));
   };
 
-  const commit = (updater: (nodes: ResearchNode[]) => ResearchNode[]) => {
+  const withComputed = (nodes: ResearchNode[]) => computeDerivedStatus(nodes);
+
+  const needsRelayout = (patch: Partial<ResearchNode>) =>
+    'parentId' in patch || 'collapsed' in patch;
+
+  type ApplyNodesOptions = { relayout?: boolean; history?: boolean };
+
+  const applyNodes = (
+    updater: (nodes: ResearchNode[]) => ResearchNode[],
+    options: ApplyNodesOptions = {}
+  ) => {
+    const { relayout = true, history = true } = options;
     set((state) => {
-      const next = withLayout(updater(state.nodes));
+      const raw = updater(state.nodes);
+      const nodes = relayout ? withLayout(raw) : raw;
       return {
-        nodes: next,
-        past: [...state.past, state.nodes].slice(-HISTORY_LIMIT),
-        future: [],
+        nodes,
+        computedNodes: withComputed(nodes),
+        ...(history
+          ? { past: [...state.past, state.nodes].slice(-HISTORY_LIMIT), future: [] }
+          : {}),
       };
     });
     persist();
+  };
+
+  const commit = (updater: (nodes: ResearchNode[]) => ResearchNode[]) => {
+    applyNodes(updater, { relayout: true, history: true });
+  };
+
+  const patchNodes = (updater: (nodes: ResearchNode[]) => ResearchNode[]) => {
+    applyNodes(updater, { relayout: false, history: true });
   };
 
   return {
     researchSlug: null,
     docName: '',
     nodes: [],
+    computedNodes: [],
     selectedId: null,
     selectedIds: [],
     loaded: false,
@@ -113,6 +138,7 @@ export const useTreeStore = create<TreeState>((set, get) => {
         researchSlug: null,
         docName: '',
         nodes: [],
+        computedNodes: [],
         selectedId: null,
         selectedIds: [],
         loaded: false,
@@ -137,6 +163,7 @@ export const useTreeStore = create<TreeState>((set, get) => {
           researchSlug: slug,
           docName: doc.name,
           nodes: migrated,
+          computedNodes: withComputed(migrated),
           loaded: true,
           selectedId: migrated[0]?.id ?? null,
           selectedIds: migrated[0]?.id ? [migrated[0].id] : [],
@@ -154,6 +181,7 @@ export const useTreeStore = create<TreeState>((set, get) => {
           researchSlug: slug,
           docName: '降低 API 延遲（示範）',
           nodes: seed,
+          computedNodes: withComputed(seed),
           loaded: true,
           selectedId: seed[0]?.id ?? null,
           selectedIds: seed[0]?.id ? [seed[0].id] : [],
@@ -169,7 +197,7 @@ export const useTreeStore = create<TreeState>((set, get) => {
       return false;
     },
 
-    computed: () => computeDerivedStatus(get().nodes),
+    computed: () => get().computedNodes,
 
     select: (id, options) => {
       if (id === null) {
@@ -273,17 +301,20 @@ export const useTreeStore = create<TreeState>((set, get) => {
     },
 
     updateNode: (id, patch) => {
-      commit((nodes) => nodes.map((n) => (n.id === id ? { ...n, ...patch } : n)));
+      applyNodes(
+        (nodes) => nodes.map((n) => (n.id === id ? { ...n, ...patch } : n)),
+        { relayout: needsRelayout(patch), history: true }
+      );
     },
 
     setStatus: (id, status) => {
-      commit((nodes) => nodes.map((n) => (n.id === id ? { ...n, status } : n)));
+      patchNodes((nodes) => nodes.map((n) => (n.id === id ? { ...n, status } : n)));
     },
 
     setStatusForSelected: (status) => {
       const ids = new Set(get().selectedIds);
       if (!ids.size) return;
-      commit((nodes) =>
+      patchNodes((nodes) =>
         nodes.map((n) => (ids.has(n.id) ? { ...n, status } : n))
       );
     },
@@ -349,7 +380,7 @@ export const useTreeStore = create<TreeState>((set, get) => {
     },
 
     addEvidence: (nodeId, ev) => {
-      commit((nodes) =>
+      patchNodes((nodes) =>
         nodes.map((n) => {
           if (n.id !== nodeId) return n;
           return syncStatusWithEvidence({
@@ -361,7 +392,7 @@ export const useTreeStore = create<TreeState>((set, get) => {
     },
 
     updateEvidence: (nodeId, evId, patch) => {
-      commit((nodes) =>
+      patchNodes((nodes) =>
         nodes.map((n) => {
           if (n.id !== nodeId) return n;
           return syncStatusWithEvidence({
@@ -373,7 +404,7 @@ export const useTreeStore = create<TreeState>((set, get) => {
     },
 
     removeEvidence: (nodeId, evId) => {
-      commit((nodes) =>
+      patchNodes((nodes) =>
         nodes.map((n) => {
           if (n.id !== nodeId) return n;
           return syncStatusWithEvidence({
@@ -388,6 +419,7 @@ export const useTreeStore = create<TreeState>((set, get) => {
       const next = withLayout(syncAllNodesEvidenceStatus(nodes.map(migrateNode)));
       set((state) => ({
         nodes: next,
+        computedNodes: withComputed(next),
         docName: name ?? state.docName,
         selectedId: next[0]?.id ?? null,
         selectedIds: next[0]?.id ? [next[0].id] : [],
@@ -398,10 +430,14 @@ export const useTreeStore = create<TreeState>((set, get) => {
     },
 
     relayout: () => {
-      set((state) => ({
-        nodes: withLayout(state.nodes),
-        fitViewRequest: state.fitViewRequest + 1,
-      }));
+      set((state) => {
+        const nodes = withLayout(state.nodes);
+        return {
+          nodes,
+          computedNodes: withComputed(nodes),
+          fitViewRequest: state.fitViewRequest + 1,
+        };
+      });
       persist();
     },
 
@@ -411,6 +447,7 @@ export const useTreeStore = create<TreeState>((set, get) => {
         const previous = state.past[state.past.length - 1];
         return {
           nodes: previous,
+          computedNodes: withComputed(previous),
           past: state.past.slice(0, -1),
           future: [state.nodes, ...state.future].slice(0, HISTORY_LIMIT),
         };
@@ -424,6 +461,7 @@ export const useTreeStore = create<TreeState>((set, get) => {
         const next = state.future[0];
         return {
           nodes: next,
+          computedNodes: withComputed(next),
           future: state.future.slice(1),
           past: [...state.past, state.nodes].slice(0, HISTORY_LIMIT),
         };

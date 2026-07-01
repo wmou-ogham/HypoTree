@@ -65,7 +65,7 @@ function blurSidebarField() {
 }
 
 export function Canvas() {
-  const nodes = useTreeStore((s) => s.nodes);
+  const computedNodes = useTreeStore((s) => s.computedNodes);
   const selectedIds = useTreeStore((s) => s.selectedIds);
   const select = useTreeStore((s) => s.select);
   const setEditing = useTreeStore((s) => s.setEditing);
@@ -73,22 +73,20 @@ export function Canvas() {
 
   const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
 
-  const computed = useMemo(() => useTreeStore.getState().computed(), [nodes]);
-
   const childCount = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const n of computed) {
+    for (const n of computedNodes) {
       if (n.parentId)
         counts.set(n.parentId, (counts.get(n.parentId) ?? 0) + 1);
     }
     return counts;
-  }, [computed]);
+  }, [computedNodes]);
 
-  const hidden = useMemo(() => hiddenSet(computed), [computed]);
+  const hidden = useMemo(() => hiddenSet(computedNodes), [computedNodes]);
 
   const rfNodes: Node[] = useMemo(
     () =>
-      computed
+      computedNodes
         .filter((n) => !hidden.has(n.id))
         .map((n) => ({
           id: n.id,
@@ -98,13 +96,13 @@ export function Canvas() {
           selected: selectedSet.has(n.id),
           selectable: false,
         })),
-    [computed, hidden, childCount, selectedSet]
+    [computedNodes, hidden, childCount, selectedSet]
   );
 
   const rfEdges: Edge[] = useMemo(
     () => {
-      const byId = new Map(computed.map((n) => [n.id, n]));
-      return computed
+      const byId = new Map(computedNodes.map((n) => [n.id, n]));
+      return computedNodes
         .filter((n) => n.parentId && byId.has(n.parentId))
         .filter((n) => !hidden.has(n.id) && !hidden.has(n.parentId!))
         .map((n) => {
@@ -116,7 +114,6 @@ export function Canvas() {
             source: n.parentId!,
             target: n.id,
             type: 'smoothstep',
-            animated: parent.status === 'experimenting',
             selectable: false,
             focusable: false,
             interactionWidth: 0,
@@ -132,7 +129,7 @@ export function Canvas() {
           } satisfies Edge;
         });
     },
-    [computed, hidden]
+    [computedNodes, hidden]
   );
 
   const onNodeClick: NodeMouseHandler = useCallback(
@@ -187,6 +184,7 @@ export function Canvas() {
       selectionKeyCode={null}
       panOnDrag={[1, 2]}
       panActivationKeyCode="Space"
+      onlyRenderVisibleElements
       defaultEdgeOptions={{ type: 'smoothstep', interactionWidth: 0 }}
     >
       <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#1e293b" />
