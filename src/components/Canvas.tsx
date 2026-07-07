@@ -161,7 +161,6 @@ export function Canvas() {
       selectionOnDrag={false}
       selectionKeyCode={null}
       panOnDrag={[1, 2]}
-      panActivationKeyCode="Space"
       defaultEdgeOptions={{ type: 'smoothstep', interactionWidth: 0 }}
     >
       <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#1e293b" />
