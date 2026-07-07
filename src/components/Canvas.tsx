@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo } from 'react';
+import { toPng } from 'html-to-image';
 import { useIsMobile } from '../hooks/useIsMobile';
 import {
   Background,
@@ -18,6 +19,74 @@ import { isShiftClick, useShiftHeld } from '../hooks/useShiftHeld';
 import { hiddenNodeIds } from '../lib/visibleNodes';
 
 const nodeTypes = { research: ResearchNodeView };
+
+/** Toolbar 透過此 ref 觸發 PNG 匯出（需在 ReactFlowProvider 內才能 fitView） */
+export const pngExportTrigger: { current: (() => Promise<void>) | null } = { current: null };
+
+const PNG_PIXEL_RATIO = 2;
+const PNG_BG = '#0b1120';
+
+function PngExportController() {
+  const { fitView } = useReactFlow();
+  const docName = useTreeStore((s) => s.docName);
+
+  useEffect(() => {
+    pngExportTrigger.current = async () => {
+      // 1. fit view 並稍等動畫結束
+      fitView({ padding: 0.13, maxZoom: 1.2, duration: 320 });
+      await new Promise((r) => setTimeout(r, 400));
+
+      // 2. 截圖：只取 ReactFlow 畫布，排除縮放控制
+      const el = document.querySelector('.react-flow') as HTMLElement | null;
+      if (!el) return;
+
+      const dataUrl = await toPng(el, {
+        backgroundColor: PNG_BG,
+        pixelRatio: PNG_PIXEL_RATIO,
+        filter: (node) => {
+          if (node instanceof HTMLElement) {
+            if (node.classList.contains('react-flow__controls')) return false;
+            if (node.classList.contains('react-flow__panel')) return false;
+          }
+          return true;
+        },
+      });
+
+      // 3. 在右下角壓水印
+      const img = new Image();
+      img.src = dataUrl;
+      await new Promise<void>((r) => { img.onload = () => r(); });
+
+      const cvs = document.createElement('canvas');
+      cvs.width = img.width;
+      cvs.height = img.height;
+      const ctx = cvs.getContext('2d')!;
+      ctx.drawImage(img, 0, 0);
+
+      const s = PNG_PIXEL_RATIO;
+      const pad = 18 * s;
+      const fontSize = 14 * s;
+      ctx.font = `600 ${fontSize}px Inter, system-ui, sans-serif`;
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'bottom';
+      // 陰影讓文字在亮色背景上也清楚
+      ctx.shadowColor = 'rgba(0,0,0,0.5)';
+      ctx.shadowBlur = 4 * s;
+      ctx.fillStyle = 'rgba(255,255,255,0.35)';
+      ctx.fillText('🌲 hypotree', cvs.width - pad, cvs.height - pad);
+
+      // 4. 下載
+      const a = document.createElement('a');
+      a.href = cvs.toDataURL('image/png');
+      a.download = `${docName || 'hypotree'}.png`;
+      a.click();
+    };
+
+    return () => { pngExportTrigger.current = null; };
+  }, [fitView, docName]);
+
+  return null;
+}
 
 function FitViewController() {
   const fitViewRequest = useTreeStore((s) => s.fitViewRequest);
@@ -171,6 +240,7 @@ export function Canvas() {
       />
       <FitViewController />
       <MarqueeSelection />
+      <PngExportController />
     </ReactFlow>
   );
 }

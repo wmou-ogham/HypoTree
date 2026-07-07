@@ -1,8 +1,9 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTreeStore } from '../store/useTreeStore';
 import { exportMarkdown, importMarkdown, migrateNode } from '../lib/markdown';
 import { copyResearchUrl } from '../pages/ResearchEditor';
+import { pngExportTrigger } from './Canvas';
 import { researchPath } from '../lib/slug';
 import type { ResearchNode, TreeDocument } from '../types';
 
@@ -31,6 +32,17 @@ export function Toolbar({ slug }: ToolbarProps) {
   const redo = useTreeStore((s) => s.redo);
 
   const fileRef = useRef<HTMLInputElement>(null);
+  const [exportingPng, setExportingPng] = useState(false);
+
+  const handleExportPng = async () => {
+    if (!pngExportTrigger.current || exportingPng) return;
+    setExportingPng(true);
+    try {
+      await pngExportTrigger.current();
+    } finally {
+      setExportingPng(false);
+    }
+  };
 
   const exportJson = () => {
     const doc: TreeDocument = {
@@ -123,6 +135,14 @@ export function Toolbar({ slug }: ToolbarProps) {
           onClick={exportJson}
         >
           匯出 JSON
+        </button>
+        <button
+          className="rounded-md border border-violet-500 bg-violet-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-50"
+          onClick={handleExportPng}
+          disabled={exportingPng}
+          title="fit 畫面後匯出為 PNG（含 hypotree 浮水印）"
+        >
+          {exportingPng ? '匯出中…' : '匯出 PNG'}
         </button>
         <input
           ref={fileRef}
