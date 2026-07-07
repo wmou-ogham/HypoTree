@@ -23,26 +23,41 @@ const nodeTypes = { research: ResearchNodeView };
 /** Toolbar 透過此 ref 觸發 PNG 匯出（需在 ReactFlowProvider 內才能 fitView） */
 export const pngExportTrigger: { current: (() => Promise<void>) | null } = { current: null };
 
-const PNG_PIXEL_RATIO = 2;
 const PNG_BG = '#0b1120';
 
+/**
+ * 根據 fitView 後的縮放比動態決定 pixelRatio：
+ * - zoom 越小（圖越大）→ pixelRatio 越高，確保節點文字清晰
+ * - 最低 2x（普通視圖），最高 6x（非常小的縮放），避免檔案過大
+ */
+function calcPixelRatio(zoom: number): number {
+  // 目標：最終輸出圖像的每個「畫面像素」對應 2 個「畫布像素」(baseline)
+  // 如果 zoom=0.5，節點在螢幕上縮小一半，需要加倍採樣才有同等清晰度
+  const ideal = Math.ceil(2 / Math.max(zoom, 0.1));
+  return Math.min(6, Math.max(2, ideal));
+}
+
 function PngExportController() {
-  const { fitView } = useReactFlow();
+  const { fitView, getViewport } = useReactFlow();
   const docName = useTreeStore((s) => s.docName);
 
   useEffect(() => {
     pngExportTrigger.current = async () => {
       // 1. fit view 並稍等動畫結束
       fitView({ padding: 0.13, maxZoom: 1.2, duration: 320 });
-      await new Promise((r) => setTimeout(r, 400));
+      await new Promise((r) => setTimeout(r, 420));
 
-      // 2. 截圖：只取 ReactFlow 畫布，排除縮放控制
+      // 2. 根據目前縮放比計算輸出解析度
+      const { zoom } = getViewport();
+      const pixelRatio = calcPixelRatio(zoom);
+
+      // 3. 截圖：只取 ReactFlow 畫布，排除縮放控制
       const el = document.querySelector('.react-flow') as HTMLElement | null;
       if (!el) return;
 
       const dataUrl = await toPng(el, {
         backgroundColor: PNG_BG,
-        pixelRatio: PNG_PIXEL_RATIO,
+        pixelRatio,
         filter: (node) => {
           if (node instanceof HTMLElement) {
             if (node.classList.contains('react-flow__controls')) return false;
@@ -52,7 +67,7 @@ function PngExportController() {
         },
       });
 
-      // 3. 在右下角壓水印
+      // 4. 在右下角壓水印（大小固定為「視覺上 14px」，不隨 pixelRatio 等比放大）
       const img = new Image();
       img.src = dataUrl;
       await new Promise<void>((r) => { img.onload = () => r(); });
@@ -63,19 +78,18 @@ function PngExportController() {
       const ctx = cvs.getContext('2d')!;
       ctx.drawImage(img, 0, 0);
 
-      const s = PNG_PIXEL_RATIO;
+      const s = pixelRatio;
       const pad = 18 * s;
       const fontSize = 14 * s;
       ctx.font = `600 ${fontSize}px Inter, system-ui, sans-serif`;
       ctx.textAlign = 'right';
       ctx.textBaseline = 'bottom';
-      // 陰影讓文字在亮色背景上也清楚
       ctx.shadowColor = 'rgba(0,0,0,0.5)';
       ctx.shadowBlur = 4 * s;
       ctx.fillStyle = 'rgba(255,255,255,0.35)';
       ctx.fillText('🌲 hypotree', cvs.width - pad, cvs.height - pad);
 
-      // 4. 下載
+      // 5. 下載
       const a = document.createElement('a');
       a.href = cvs.toDataURL('image/png');
       a.download = `${docName || 'hypotree'}.png`;
@@ -83,7 +97,7 @@ function PngExportController() {
     };
 
     return () => { pngExportTrigger.current = null; };
-  }, [fitView, docName]);
+  }, [fitView, getViewport, docName]);
 
   return null;
 }
